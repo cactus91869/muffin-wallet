@@ -1,0 +1,47 @@
+namespace: muffin
+
+hosts:
+  wallet: muffin-wallet.ru
+
+services:
+  wallet:
+    host: muffin-wallet
+    port: 80
+  currency:
+    host: muffin-currency
+    port: 8083
+
+serviceAccounts:
+  wallet: wallet-sa
+  currency: currency-sa
+
+mtls:
+  mode: STRICT
+
+resilience:
+  retries:
+    attempts: 5
+    perTryTimeout: 3s
+  timeout: 15s
+
+circuitBreaker:
+  maxConnections: 100
+  http1MaxPendingRequests: 100
+  http2MaxRequests: 1000
+  consecutive5xxErrors: 5
+  interval: 5s
+  baseEjectionTime: 30s
+  maxEjectionPercent: 50
+
+externalDb:
+  name: external-postgres
+  enabled: true
+  host: host.minikube.internal
+  port: 5435
+  protocol: TCP
+  tls:
+    mode: DISABLE
+
+
+tls:
+  mode: ISTIO_MUTUAL

@@ -1,0 +1,36 @@
+replicaCount: 1
+
+image:
+  repository: notocactus/muffin-currency
+  tag: "latest"
+
+nameOverride: ""
+fullnameOverride: ""
+
+containerPort: 8080
+
+service:
+  type: ClusterIP
+  port: 8083
+  targetPort: 8080
+
+livenessProbe:
+  httpGet:
+    path: /rate?from=PLAIN&to=CHOKOLATE
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10
+readinessProbe:
+  httpGet:
+    path: /rate?from=PLAIN&to=CHOKOLATE
+    port: 8080
+  initialDelaySeconds: 2
+  periodSeconds: 5
+
+autoscaling:
+  enabled: false
+
+serviceAccount:
+  create: true
+  name: "currency-sa"
+
