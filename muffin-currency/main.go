@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -39,7 +43,7 @@ var (
 			Name: "muffin_currency_requests_total",
 			Help: "Total number of HTTP requests",
 		},
-		[]string{"method", "path", "status", "trace_id"},
+		[]string{"method", "path", "status"},
 	)
 
 	httpRequestDuration = promauto.NewHistogramVec(
@@ -48,7 +52,7 @@ var (
 			Help:    "HTTP request duration",
 			Buckets: prometheus.DefBuckets,
 		},
-		[]string{"method", "path", "trace_id"},
+		[]string{"method", "path"},
 	)
 
 	currencyRateGauge = promauto.NewGaugeVec(
@@ -56,7 +60,7 @@ var (
 			Name: "muffin_currency_rate",
 			Help: "Current currency exchange rate",
 		},
-		[]string{"from", "to", "trace_id"},
+		[]string{"from", "to"},
 	)
 
 	// Health метрика
@@ -110,9 +114,17 @@ func initTracing(serviceName, zipkinURL string) error {
 func tracingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Start a new span for this request
+
+		spanContext, err := ParseTraceparent(r.Header.Get("traceparent"))
+		if err != nil {
+			slog.Warn("Failed to parse traceparent", "error", err, "traceparent", r.Header.Get("traceparent"))
+			spanContext = model.SpanContext{} // Создаем новый контекст
+		}
+
 		span := tracer.StartSpan(r.URL.Path,
 			zipkin.Kind(model.Server),
 			zipkin.RemoteEndpoint(nil),
+			zipkin.Parent(spanContext),
 		)
 		defer span.Finish()
 
@@ -192,13 +204,11 @@ func metricsMiddleware(next http.Handler) http.Handler {
 			r.Method,
 			r.URL.Path,
 			fmt.Sprintf("%d", rw.statusCode),
-			traceID,
 		).Inc()
 
 		httpRequestDuration.WithLabelValues(
 			r.Method,
 			r.URL.Path,
-			traceID,
 		).Observe(duration)
 	})
 }
@@ -274,7 +284,7 @@ func getRateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Export to Prometheus with trace ID
-	currencyRateGauge.WithLabelValues(from, to, traceID).Set(rate)
+	currencyRateGauge.WithLabelValues(from, to).Set(rate)
 
 	response := CurrencyRate{
 		From: from,
@@ -341,13 +351,22 @@ func readyHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	// Настройка structured logging
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+	logFile, err := os.OpenFile("logs/app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		slog.Error("Failed to open log file", "error", err)
+		os.Exit(1)
+	}
+	defer logFile.Close()
+
+	// Создаем multi-writer для логирования в файл и stdout
+	multiWriter := io.MultiWriter(os.Stdout, logFile)
+	logger := slog.New(slog.NewJSONHandler(multiWriter, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 	slog.SetDefault(logger)
 
 	// Инициализируем Zipkin tracing
-	err := initTracing("currency-service", "http://host.minikube.internal:9411/api/v2/spans")
+	err = initTracing("muffin-currency", "http://zipkin.monitoring.svc.cluster.local:9411/api/v2/spans")
 	if err != nil {
 		slog.Error("Failed to initialize Zipkin tracing", "error", err)
 		os.Exit(1)
@@ -399,17 +418,61 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		if err := server.Shutdown(ctx); err != nil {
+		if err = server.Shutdown(ctx); err != nil {
 			logger.Error("Server forced to shutdown", "error", err)
 		}
 	}()
 
 	logger.Info("Starting server",
 		"port", port,
-		"zipkin_endpoint", "http://localhost:9411/api/v2/spans")
+		"zipkin_endpoint", "http://zipkin.monitoring.svc.cluster.local:9411/api/v2/spans")
 
-	if err := server.ListenAndServe(); err != http.ErrServerClosed {
+	if err = server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Error("Server failed to start", "error", err)
 		os.Exit(1)
 	}
+}
+
+func ParseTraceparent(tp string) (model.SpanContext, error) {
+	// Формат: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+	if tp == "" {
+		return model.SpanContext{}, nil // Нет заголовка - создаем новый trace
+	}
+
+	parts := strings.Split(tp, "-")
+	if len(parts) < 4 {
+		return model.SpanContext{}, fmt.Errorf("invalid traceparent format: %s", tp)
+	}
+
+	// 1. Парсим TraceID (16 байт / 32 символа)
+	tIDBytes, err := hex.DecodeString(parts[1])
+	if err != nil || len(tIDBytes) != 16 {
+		return model.SpanContext{}, fmt.Errorf("invalid traceid: %s, error: %v", parts[1], err)
+	}
+
+	traceID := model.TraceID{
+		High: binary.BigEndian.Uint64(tIDBytes[:8]),
+		Low:  binary.BigEndian.Uint64(tIDBytes[8:]),
+	}
+
+	// 2. Парсим SpanID (8 байт / 16 символов)
+	sIDBytes, err := hex.DecodeString(parts[2])
+	if err != nil || len(sIDBytes) != 8 {
+		return model.SpanContext{}, fmt.Errorf("invalid spanid: %s, error: %v", parts[2], err)
+	}
+	spanID := model.ID(binary.BigEndian.Uint64(sIDBytes))
+
+	// 3. Парсим флаги (последний байт)
+	flagsBytes, err := hex.DecodeString(parts[3])
+	sampled := false
+	if err == nil && len(flagsBytes) > 0 {
+		// Бит 0 отвечает за сэмплирование
+		sampled = (flagsBytes[0] & 0x01) == 0x01
+	}
+
+	return model.SpanContext{
+		TraceID: traceID,
+		ID:      spanID,
+		Sampled: &sampled,
+	}, nil
 }

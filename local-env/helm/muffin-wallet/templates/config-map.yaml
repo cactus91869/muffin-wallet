@@ -29,7 +29,7 @@ data:
           probability: 1.0 # Sample 100% of traces for demo
       zipkin:
         tracing: 
-          endpoint: "http://host.minikube.internal:9411/api/v2/spans" # Zipkin's v2 API
+          endpoint: "http://zipkin.monitoring.svc.cluster.local:9411/api/v2/spans" # Zipkin's v2 API
       endpoints:
         web:
           exposure:
