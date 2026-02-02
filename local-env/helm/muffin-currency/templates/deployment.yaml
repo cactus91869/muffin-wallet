@@ -16,6 +16,14 @@ spec:
       labels:
         {{- include "muffin-currency.labels" . | nindent 8 }}
     spec:
+      volumes:
+        - name: log-volume
+          emptyDir: {}
+        - name: promtail-config
+          configMap:
+            name: promtail-config-currency
+
+
       serviceAccountName: {{ .Values.serviceAccount.name }}
       containers:
         - name: {{ .Chart.Name }}
@@ -30,3 +38,17 @@ spec:
           readinessProbe:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          volumeMounts:
+            - name: log-volume
+              mountPath: /logs
+        
+        - name: promtail
+          image: grafana/promtail:latest
+          args:
+            - -config.file=/etc/promtail/promtail.yaml
+          volumeMounts:
+            - name: log-volume
+              mountPath: /logs
+            - name: promtail-config
+              mountPath: /etc/promtail/promtail.yaml
+              subPath: promtail.yaml

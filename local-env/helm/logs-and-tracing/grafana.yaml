@@ -56,3 +56,6 @@ ingress:
   enabled: true
   hosts:
     - grafana.local
+
+initChownData:
+  enabled: false

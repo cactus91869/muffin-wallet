@@ -16,14 +16,14 @@ releases:
     labels:
       component: monitoring
   
-  - name: promtail
-    namespace: monitoring
-    chart: grafana/promtail
-    version: 6.17.1
-    values:
-      - logs-and-tracing/promtail.yaml
-    labels:
-      component: monitoring
+  # - name: promtail
+  #   namespace: monitoring
+  #   chart: grafana/promtail
+  #   version: 6.17.1
+  #   values:
+  #     - logs-and-tracing/promtail.yaml
+  #   labels:
+  #     component: monitoring
 
   - name: zipkin
     chart: openzipkin/zipkin

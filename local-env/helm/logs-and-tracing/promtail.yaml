@@ -1,87 +1,87 @@
-# Promtail values
-config:
-  serverPort: 3101
-  clients:
-    - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
-  # positions: 
-  #   filename: /run/promtail/positions.yaml
-  scrape_configs: 
-  - job_name: 'kubernetes-pods'
-    kubernetes_sd_configs:
-      - role: pod
-    pipeline_stages:
-      - match:
-          selector: '{container="muffin-wallet"}'
-          stages:
-            - regex:
-                expression: '^(?P<ts>[^ ]+)\s+(?P<level>[A-Z]+)\s+\[(?P<trace_id>[a-f0-9]*),(?P<span_id>[a-f0-9]*)\]'
-            - labels:
-                level:
-        # (опционально) trace_id в label НЕ советую, но для отладки можно:
-        #    trace_id:
-    # static_configs:
-    #   - targets:
-    #       - localhost
-    #     labels:
-    #       job: muffin-wallet
-    #       __path__: /logs/*.log
+# # Promtail values
+# config:
+#   serverPort: 3101
+#   clients:
+#     - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
+#   # positions: 
+#   #   filename: /run/promtail/positions.yaml
+#   scrape_configs: 
+#   - job_name: 'kubernetes-pods'
+#     kubernetes_sd_configs:
+#       - role: pod
+#     pipeline_stages:
+#       - match:
+#           selector: '{container="muffin-wallet"}'
+#           stages:
+#             - regex:
+#                 expression: '^(?P<ts>[^ ]+)\s+(?P<level>[A-Z]+)\s+\[(?P<trace_id>[a-f0-9]*),(?P<span_id>[a-f0-9]*)\]'
+#             - labels:
+#                 level:
+#         # (опционально) trace_id в label НЕ советую, но для отладки можно:
+#         #    trace_id:
+#     # static_configs:
+#     #   - targets:
+#     #       - localhost
+#     #     labels:
+#     #       job: muffin-wallet
+#     #       __path__: /logs/*.log
 
-    # pipeline_stages:
-    #   - match:
-    #       selector: '{namespace="muffin"} |~ "^\\{"'
-    #       stages:
-    #         - json:
-    #             expressions:
-    #               level: level
-    #               trace_id: trace_id
-    #               span_id: span_id
-    #         - labels:
-    #             level:
-    #             trace_id:
+#     # pipeline_stages:
+#     #   - match:
+#     #       selector: '{namespace="muffin"} |~ "^\\{"'
+#     #       stages:
+#     #         - json:
+#     #             expressions:
+#     #               level: level
+#     #               trace_id: trace_id
+#     #               span_id: span_id
+#     #         - labels:
+#     #             level:
+#     #             trace_id:
 
-    #   - match:
-    #       selector: '{namespace="muffin"} !~ "^\\{"'
-    #       stages:
-    #         - regex:
-    #             expression: '^(?P<ts>[^ ]+)\s+(?P<level>[A-Z]+)\s+\[(?P<trace_id>[a-f0-9]+),(?P<span_id>[a-f0-9]+)\]\s+(?P<rest>.*)$'
-    #         - labels:
-    #             level:
-    #             trace_id:
+#     #   - match:
+#     #       selector: '{namespace="muffin"} !~ "^\\{"'
+#     #       stages:
+#     #         - regex:
+#     #             expression: '^(?P<ts>[^ ]+)\s+(?P<level>[A-Z]+)\s+\[(?P<trace_id>[a-f0-9]+),(?P<span_id>[a-f0-9]+)\]\s+(?P<rest>.*)$'
+#     #         - labels:
+#     #             level:
+#     #             trace_id:
 
 
 
-    # relabel_configs:
-    #   - source_labels: [__meta_kubernetes_namespace]
-    #     action: keep
-    #     regex: muffin
+#     # relabel_configs:
+#     #   - source_labels: [__meta_kubernetes_namespace]
+#     #     action: keep
+#     #     regex: muffin
 
-    #   - source_labels: [__meta_kubernetes_namespace]
-    #     target_label: namespace
+#     #   - source_labels: [__meta_kubernetes_namespace]
+#     #     target_label: namespace
 
-    #   - source_labels: [__meta_kubernetes_pod_label_app]
-    #     target_label: app
+#     #   - source_labels: [__meta_kubernetes_pod_label_app]
+#     #     target_label: app
 
-    #   - source_labels: [__meta_kubernetes_pod_name]
-    #     target_label: pod
+#     #   - source_labels: [__meta_kubernetes_pod_name]
+#     #     target_label: pod
 
-    #   - source_labels: [__meta_kubernetes_pod_container_name]
-    #     target_label: container
+#     #   - source_labels: [__meta_kubernetes_pod_container_name]
+#     #     target_label: container
 
-    #   - action: replace
-    #     source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
-    #     separator: /
-    #     target_label: __path__
-    #     replacement: /var/log/pods/*$1/*.log
+#     #   - action: replace
+#     #     source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+#     #     separator: /
+#     #     target_label: __path__
+#     #     replacement: /var/log/pods/*$1/*.log
 
-service:
-  type: NodePort
-  ports:
-    http: 3101
+# service:
+#   type: NodePort
+#   ports:
+#     http: 3101
 
-resources:
-  limits:
-    cpu: 200m
-    memory: 128Mi
-  requests:
-    cpu: 100m
-    memory: 64Mi
+# resources:
+#   limits:
+#     cpu: 200m
+#     memory: 128Mi
+#   requests:
+#     cpu: 100m
+#     memory: 64Mi

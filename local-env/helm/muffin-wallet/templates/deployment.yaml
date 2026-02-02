@@ -91,3 +91,14 @@ spec:
         #       mountPath: /logs
         #     - name: promtail-config
         #       mountPath: /etc/promtail
+
+        - name: promtail
+          image: grafana/promtail:latest
+          args:
+            - -config.file=/etc/promtail/promtail.yaml
+          volumeMounts:
+            - name: log-volume
+              mountPath: /logs
+            - name: promtail-config
+              mountPath: /etc/promtail/promtail.yaml
+              subPath: promtail.yaml
